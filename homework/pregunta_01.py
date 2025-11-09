@@ -20,69 +20,80 @@ def pregunta_01():
     """
     import pandas as pd
 
+    import pandas as pd
+
     ruta = "files/input/clusters_report.txt"
 
-    patron_inicio = re.compile(r"^\s*(\d+)\s+(\d+)\s+([\d,]+)\s*%\s+(.*)$")
-    registros = []
+
+    pat_inicio = re.compile(r"^\s*(\d+)\s+(\d+)\s+([\d,]+)\s*%\s+(.*)$")
 
     with open(ruta, "r", encoding="utf-8") as f:
-        lineas = f.readlines()
 
-    actual = None 
+        lineas = f.readlines()[4:]
+
+    registros = []
+    actual = None
+
+    def cerrar_actual():
+        """Normaliza el campo 'principales_palabras_clave' y guarda el registro."""
+        if actual is None:
+            return
+        texto = actual["principales_palabras_clave"].strip()
+
+
+        texto = re.sub(r"\s+", " ", texto)
+
+
+        if texto.endswith("."):
+            texto = texto[:-1]
+
+
+        partes = [p.strip() for p in texto.split(",") if p.strip()]
+        actual["principales_palabras_clave"] = ", ".join(partes)
+
+        registros.append(actual)
 
     for linea in lineas:
         linea = linea.rstrip("\n")
 
-    
-        m = patron_inicio.match(linea)
-        if m:
-      
-            if actual is not None:
 
-                termos = actual["principales_palabras_clave"]
-                termos = termos.strip()
-                if termos.endswith("."):
-                    termos = termos[:-1]
-        
-                partes = [p.strip() for p in termos.split(",") if p.strip() != ""]
-                actual["principales_palabras_clave"] = ", ".join(partes)
-                registros.append(actual)
+        if not linea.strip() or set(linea.strip()) == {"-"}:
+            continue
+
+        m = pat_inicio.match(linea)
+        if m:
+
+            if actual is not None:
+                cerrar_actual()
 
             cluster = int(m.group(1))
             cantidad = int(m.group(2))
-            porcentaje_txt = m.group(3).replace(",", ".")
-            porcentaje = round(float(porcentaje_txt), 1)
+            porcentaje = float(m.group(3).replace(",", "."))
             resto = m.group(4).strip()
 
             actual = {
                 "cluster": cluster,
                 "cantidad_de_palabras_clave": cantidad,
-                "porcentaje_de_palabras_clave": porcentaje,
+                "porcentaje_de_palabras_clave": round(porcentaje, 1),
                 "principales_palabras_clave": resto,
             }
-            continue
+        else:
 
+            if actual is not None:
 
-        if actual is not None:
-            cont = linea.strip()
-            if cont:  
-                actual["principales_palabras_clave"] += " " + cont
-
+                actual["principales_palabras_clave"] += " " + linea.strip()
 
     if actual is not None:
-        termos = actual["principales_palabras_clave"].strip()
-        if termos.endswith("."):
-            termos = termos[:-1]
-        partes = [p.strip() for p in termos.split(",") if p.strip() != ""]
-        actual["principales_palabras_clave"] = ", ".join(partes)
-        registros.append(actual)
+        cerrar_actual()
 
-
-    df = pd.DataFrame(registros, columns=[
-        "cluster",
-        "cantidad_de_palabras_clave",
-        "porcentaje_de_palabras_clave",
-        "principales_palabras_clave",
-    ])
+    df = pd.DataFrame(
+        registros,
+        columns=[
+            "cluster",
+            "cantidad_de_palabras_clave",
+            "porcentaje_de_palabras_clave",
+            "principales_palabras_clave",
+        ],
+    )
 
     return df
